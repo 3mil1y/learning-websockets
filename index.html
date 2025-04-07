@@ -65,7 +65,8 @@
         const statusDiv = document.getElementById('status');
         const nicknameInput = document.getElementById('nickname');
         let nickname = '';
-        const ws = new WebSocket('ws://localhost:8080');
+        const socket = new WebSocket("ws://shuttle.proxy.rlwy.net:43733");
+
 
         function setNickname() {
             const newNickname = nicknameInput.value.trim();
