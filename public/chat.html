@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat WebSocket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        #chat {
+            width: 400px;
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            overflow-y: auto;
+        }
+        #message {
+            width: 300px;
+            padding: 5px;
+        }
+        button {
+            padding: 5px 15px;
+        }
+        .status {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #f0f0f0;
+        }
+        .message {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .own-message {
+            background-color: #e3f2fd;
+            text-align: right;
+        }
+        .other-message {
+            background-color: #f5f5f5;
+        }
+        .room-container {
+            margin-bottom: 10px;
+        }
+        .room-input {
+            padding: 5px;
+            margin-right: 5px;
+        }
+        .user-info {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #e8f5e9;
+        }
+    </style>
+</head>
+<body>
+    <div id="userInfo" class="user-info"></div>
+    <div class="room-container">
+        <input type="text" id="roomId" class="room-input" placeholder="Digite o ID da sala...">
+        <button onclick="joinRoom()">Entrar na Sala</button>
+    </div>
+    <div id="status" class="status">Conectando ao servidor...</div>
+    <div id="chat"></div>
+    <input type="text" id="message" placeholder="Digite sua mensagem..." disabled>
+    <button onclick="sendMessage()" disabled>Enviar</button>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const statusDiv = document.getElementById('status');
+        const roomInput = document.getElementById('roomId');
+        const userInfoDiv = document.getElementById('userInfo');
+        let ws;
+        let currentRoom = null;
+        let user = null;
+
+        // Carrega informações do usuário
+        window.onload = function() {
+            const storedUser = localStorage.getItem('user');
+            if (!storedUser) {
+                window.location.href = 'login.html';
+                return;
+            }
+            user = JSON.parse(storedUser);
+            userInfoDiv.textContent = `Logado como: ${user.name}`;
+            connectWebSocket();
+        };
+
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8080');
+
+            ws.onopen = function() {
+                console.log('Conectado ao servidor WebSocket');
+                statusDiv.textContent = 'Conectado ao servidor. Entre em uma sala para começar a conversar.';
+                statusDiv.style.backgroundColor = '#dff0d8';
+            };
+
+            ws.onmessage = function(event) {
+                console.log('Mensagem recebida:', event.data);
+                const data = JSON.parse(event.data);
+                if (data.type === 'message') {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'message other-message';
+                    messageElement.textContent = `${data.nickname}: ${data.message}`;
+                    chat.appendChild(messageElement);
+                    chat.scrollTop = chat.scrollHeight;
+                }
+            };
+
+            ws.onclose = function() {
+                console.log('Conexão fechada');
+                statusDiv.textContent = 'Conexão fechada. Tentando reconectar...';
+                statusDiv.style.backgroundColor = '#f2dede';
+                setTimeout(function() {
+                    connectWebSocket();
+                }, 5000);
+            };
+
+            ws.onerror = function(error) {
+                console.error('Erro WebSocket:', error);
+                statusDiv.textContent = 'Erro na conexão';
+                statusDiv.style.backgroundColor = '#f2dede';
+            };
+        }
+
+        function joinRoom() {
+            const roomId = roomInput.value.trim();
+            if (roomId !== '') {
+                currentRoom = roomId;
+                ws.send(JSON.stringify({
+                    type: 'join',
+                    roomId: roomId
+                }));
+                messageInput.disabled = false;
+                document.querySelector('button[onclick="sendMessage()"]').disabled = false;
+                statusDiv.textContent = `Conectado à sala: ${roomId}`;
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message.trim() !== '' && currentRoom !== null) {
+                console.log('Enviando mensagem:', message);
+                const data = {
+                    type: 'message',
+                    nickname: user.name,
+                    message: message
+                };
+                
+                // Exibe a própria mensagem imediatamente
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message own-message';
+                messageElement.textContent = `${user.name}: ${message}`;
+                chat.appendChild(messageElement);
+                chat.scrollTop = chat.scrollHeight;
+                
+                // Envia a mensagem para o servidor
+                ws.send(JSON.stringify(data));
+                messageInput.value = '';
+            }
+        }
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        roomInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinRoom();
+            }
+        });
+    </script>
+</body>
+</html> 

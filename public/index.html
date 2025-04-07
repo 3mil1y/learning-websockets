@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat WebSocket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        #chat {
+            width: 400px;
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            overflow-y: auto;
+        }
+        #message {
+            width: 300px;
+            padding: 5px;
+        }
+        button {
+            padding: 5px 15px;
+        }
+        .status {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #f0f0f0;
+        }
+        .nickname-container {
+            margin-bottom: 10px;
+        }
+        .nickname-input {
+            padding: 5px;
+            margin-right: 5px;
+        }
+        .message {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .own-message {
+            background-color: #e3f2fd;
+            text-align: right;
+        }
+        .other-message {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="nickname-container">
+        <input type="text" id="nickname" class="nickname-input" placeholder="Digite seu apelido...">
+        <button onclick="setNickname()">Definir Apelido</button>
+    </div>
+    <div id="status" class="status">Conectando ao servidor...</div>
+    <div id="chat"></div>
+    <input type="text" id="message" placeholder="Digite sua mensagem..." disabled>
+    <button onclick="sendMessage()" disabled>Enviar</button>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const statusDiv = document.getElementById('status');
+        const nicknameInput = document.getElementById('nickname');
+        let nickname = '';
+        const ws = new WebSocket('ws://localhost:8080');
+
+        function setNickname() {
+            const newNickname = nicknameInput.value.trim();
+            if (newNickname !== '') {
+                nickname = newNickname;
+                nicknameInput.disabled = true;
+                messageInput.disabled = false;
+                document.querySelector('button[onclick="sendMessage()"]').disabled = false;
+                statusDiv.textContent = `Conectado como: ${nickname}`;
+            }
+        }
+
+        ws.onopen = function() {
+            console.log('Conectado ao servidor WebSocket');
+            statusDiv.textContent = 'Conectado ao servidor. Defina seu apelido.';
+            statusDiv.style.backgroundColor = '#dff0d8';
+        };
+
+        ws.onmessage = function(event) {
+            console.log('Mensagem recebida:', event.data);
+            const data = JSON.parse(event.data);
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message other-message';
+            messageElement.textContent = `${data.nickname}: ${data.message}`;
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        };
+
+        ws.onclose = function() {
+            console.log('Conexão fechada');
+            statusDiv.textContent = 'Conexão fechada. Tentando reconectar...';
+            statusDiv.style.backgroundColor = '#f2dede';
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        };
+
+        ws.onerror = function(error) {
+            console.error('Erro WebSocket:', error);
+            statusDiv.textContent = 'Erro na conexão';
+            statusDiv.style.backgroundColor = '#f2dede';
+        };
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message.trim() !== '' && nickname !== '') {
+                console.log('Enviando mensagem:', message);
+                const data = {
+                    nickname: nickname,
+                    message: message
+                };
+                
+                // Exibe a própria mensagem imediatamente
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message own-message';
+                messageElement.textContent = `${nickname}: ${message}`;
+                chat.appendChild(messageElement);
+                chat.scrollTop = chat.scrollHeight;
+                
+                // Envia a mensagem para o servidor
+                ws.send(JSON.stringify(data));
+                messageInput.value = '';
+            }
+        }
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        nicknameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setNickname();
+            }
+        });
+    </script>
+</body>
+</html> 
